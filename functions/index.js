@@ -1,70 +1,65 @@
 /**
  * 阿里云 ESA Pages - GitHub 反向代理 Edge Function
  *
- * 路由规则：
- * 直接访问（推荐）：
- *   /user/repo             → github.com/user/repo
- *   /user/repo/tree/main   → github.com/user/repo/tree/main
+ * 使用方式（直接拼接原始 URL）：
+ *   https://proxy.domain/https://github.com/user/repo
+ *   https://proxy.domain/https://raw.githubusercontent.com/user/repo/main/file
+ *   https://proxy.domain/https://github.com/user/repo/releases/download/v1.0/file.zip
  *
- * 带前缀访问：
+ * 也支持短前缀：
  *   /gh/user/repo          → github.com/user/repo
  *   /raw/user/repo/...     → raw.githubusercontent.com/user/repo/...
- *   /gist/user/id          → gist.github.com/user/id
- *   /releases/user/repo/...→ github.com/user/repo/releases/...
- *   /assets/...            → github.githubassets.com/...
  *   /api/...               → api.github.com/...
- *   /objects/...           → objects.githubusercontent.com/...
  */
-
-const UPSTREAMS = {
-  'gh':       'github.com',
-  'raw':      'raw.githubusercontent.com',
-  'gist':     'gist.github.com',
-  'releases': 'github.com',
-  'assets':   'github.githubassets.com',
-  'api':      'api.github.com',
-  'objects':  'objects.githubusercontent.com',
-};
 
 // ============ 路由解析 ============
 
-function parseRoute(pathname) {
-  // /gh/user/repo/... → github.com/user/repo/...
-  const ghMatch = pathname.match(/^\/gh\/(.+)$/);
-  if (ghMatch) return { prefix: 'gh', path: `/${ghMatch[1]}` };
-
-  // /raw/user/repo/... → raw.githubusercontent.com/user/repo/...
-  const rawMatch = pathname.match(/^\/raw\/(.+)$/);
-  if (rawMatch) return { prefix: 'raw', path: `/${rawMatch[1]}` };
-
-  // /gist/user/id → gist.github.com/user/id
-  const gistMatch = pathname.match(/^\/gist\/(.+)$/);
-  if (gistMatch) return { prefix: 'gist', path: `/${gistMatch[1]}` };
-
-  // /releases/user/repo/releases/... → github.com/user/repo/releases/...
-  // /releases/user/repo → github.com/user/repo/releases
-  const releaseMatch = pathname.match(/^\/releases\/([^/]+)\/([^/]+)(\/releases\/.*)?$/);
-  if (releaseMatch) {
-    return { prefix: 'releases', path: `/${releaseMatch[1]}/${releaseMatch[2]}${releaseMatch[3] || '/releases'}` };
+function resolveTarget(pathname, search) {
+  // 方式1：直接拼接完整 URL（主要方式）
+  // 浏览器会把 https://github.com 优化成 https:/github.com（双斜杠合并）
+  // 所以两种格式都要支持
+  const fullUrlMatch = pathname.match(/^\/https?:\/\/?(.+)$/);
+  if (fullUrlMatch) {
+    const scheme = pathname.startsWith('/https') ? 'https' : 'http';
+    // fullUrlMatch[1] 可能是 "github.com/user/repo" 或 "/github.com/user/repo"
+    let rest = fullUrlMatch[1];
+    // 去掉可能残留的前导斜杠
+    if (rest.startsWith('/')) rest = rest.slice(1);
+    return `${scheme}://${rest}${search || ''}`;
   }
 
-  // /assets/... → github.githubassets.com/...
-  const assetsMatch = pathname.match(/^\/assets\/(.+)$/);
-  if (assetsMatch) return { prefix: 'assets', path: `/${assetsMatch[1]}` };
+  // 方式2：带前缀的短路径
+  const prefixMatch = pathname.match(/^\/(gh|raw|gist|releases|assets|api|objects)\/(.+)$/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1];
+    const rest = prefixMatch[2];
+    const upstreams = {
+      'gh':       'https://github.com',
+      'raw':      'https://raw.githubusercontent.com',
+      'gist':     'https://gist.github.com',
+      'releases': 'https://github.com',       // 后面需要加 /releases
+      'assets':   'https://github.githubassets.com',
+      'api':      'https://api.github.com',
+      'objects':  'https://objects.githubusercontent.com',
+    };
+    const base = upstreams[prefix];
+    if (!base) return null;
 
-  // /api/... → api.github.com/...
-  const apiMatch = pathname.match(/^\/api\/(.+)$/);
-  if (apiMatch) return { prefix: 'api', path: `/${apiMatch[1]}` };
+    if (prefix === 'releases') {
+      // /releases/user/repo/releases/... → github.com/user/repo/releases/...
+      // /releases/user/repo → github.com/user/repo/releases
+      const rm = rest.match(/^([^/]+)\/([^/]+)(\/releases\/.*)?$/);
+      if (rm) {
+        return `${base}/${rm[1]}/${rm[2]}${rm[3] || '/releases'}${search || ''}`;
+      }
+    }
+    return `${base}/${rest}${search || ''}`;
+  }
 
-  // /objects/... → objects.githubusercontent.com/...
-  const objectsMatch = pathname.match(/^\/objects\/(.+)$/);
-  if (objectsMatch) return { prefix: 'objects', path: `/${objectsMatch[1]}` };
-
-  // 默认：/user/repo/... → github.com/user/repo/...
-  // 匹配 user/repo 格式的路径（至少两段）
+  // 方式3：裸路径 /user/repo/... → github.com/user/repo/...
   const bareMatch = pathname.match(/^\/([^/]+)\/([^/]+)(\/.*)?$/);
   if (bareMatch) {
-    return { prefix: 'gh', path: pathname };
+    return `https://github.com${pathname}${search || ''}`;
   }
 
   return null;
@@ -78,13 +73,11 @@ function cleanRequestHeaders(headers) {
     'host', 'origin', 'referer', 'x-forwarded-for',
     'x-real-ip', 'cf-connecting-ip', 'cdn-loop',
   ]);
-
   for (const [key, value] of headers.entries()) {
     if (!skip.has(key.toLowerCase())) {
       cleaned.set(key, value);
     }
   }
-
   cleaned.set('User-Agent',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
     '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -92,7 +85,6 @@ function cleanRequestHeaders(headers) {
     headers.get('accept') ||
     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
   cleaned.set('Accept-Language', 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7');
-
   return cleaned;
 }
 
@@ -103,7 +95,6 @@ function buildResponseHeaders(upstreamHeaders) {
     'x-frame-options', 'strict-transport-security',
     'report-to', 'nel', 'set-cookie',
   ]);
-
   for (const [key, value] of upstreamHeaders.entries()) {
     if (!skip.has(key.toLowerCase())) {
       if (key.toLowerCase() === 'location') {
@@ -113,53 +104,46 @@ function buildResponseHeaders(upstreamHeaders) {
       }
     }
   }
-
   headers.set('Access-Control-Allow-Origin', '*');
   headers.set('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, OPTIONS');
   headers.set('Access-Control-Allow-Headers', '*');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'no-referrer');
-
   return headers;
 }
 
 // ============ 内容重写 ============
 
-function rewriteLocationHeader(value) {
-  return value
-    .replace(/https?:\/\/raw\.githubusercontent\.com\//g, '/raw/')
-    .replace(/https?:\/\/gist\.githubusercontent\.com\//g, '/gist/')
-    .replace(/https?:\/\/github\.githubassets\.com\//g, '/assets/')
-    .replace(/https?:\/\/objects\.githubusercontent\.com\//g, '/objects/');
+function rewriteLocationHeader(value, host) {
+  // 绝对 URL → 拼接到代理域名后面
+  if (value.startsWith('https://') || value.startsWith('http://')) {
+    return `//${host}/${value}`;
+  }
+  return value;
 }
 
 function rewriteHTML(html, host) {
-  html = html.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/raw/`);
-  html = html.replace(/https?:\/\/gist\.githubusercontent\.com\//g, `//${host}/gist/`);
-  html = html.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/assets/`);
-  html = html.replace(/https?:\/\/objects\.githubusercontent\.com\//g, `//${host}/objects/`);
-  html = html.replace(/https?:\/\/api\.github\.com\//g, `//${host}/api/`);
-  html = html.replace(
-    /(href|src|action|data-url|data-hydro-click-hmac)=(["'])https?:\/\/github\.com\//g,
-    `$1=$2//${host}/gh/`
-  );
-  html = html.replace(
-    /url\((["']?)https?:\/\/github\.githubassets\.com\//g,
-    `url($1//${host}/assets/`
-  );
+  // 替换所有 GitHub 绝对 URL → 代理格式
+  html = html.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/https://raw.githubusercontent.com/`);
+  html = html.replace(/https?:\/\/gist\.githubusercontent\.com\//g, `//${host}/https://gist.github.com/`);
+  html = html.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/https://github.githubassets.com/`);
+  html = html.replace(/https?:\/\/objects\.githubusercontent\.com\//g, `//${host}/https://objects.githubusercontent.com/`);
+  html = html.replace(/https?:\/\/api\.github\.com\//g, `//${host}/https://api.github.com/`);
+  html = html.replace(/https?:\/\/github\.com\//g, `//${host}/https://github.com/`);
   return html;
 }
 
 function rewriteCSS(css, host) {
-  css = css.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/assets/`);
-  css = css.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/raw/`);
+  css = css.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/https://github.githubassets.com/`);
+  css = css.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/https://raw.githubusercontent.com/`);
   return css;
 }
 
 function rewriteJS(js, host) {
-  js = js.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/raw/`);
-  js = js.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/assets/`);
-  js = js.replace(/https?:\/\/objects\.githubusercontent\.com\//g, `//${host}/objects/`);
+  js = js.replace(/https?:\/\/raw\.githubusercontent\.com\//g, `//${host}/https://raw.githubusercontent.com/`);
+  js = js.replace(/https?:\/\/github\.githubassets\.com\//g, `//${host}/https://github.githubassets.com/`);
+  js = js.replace(/https?:\/\/objects\.githubusercontent\.com\//g, `//${host}/https://objects.githubusercontent.com/`);
+  js = js.replace(/https?:\/\/github\.com\//g, `//${host}/https://github.com/`);
   return js;
 }
 
@@ -192,22 +176,15 @@ export default {
       );
     }
 
-    // 解析路由
-    const route = parseRoute(pathname);
-    if (!route) {
+    // 解析目标 URL
+    const targetURL = resolveTarget(pathname, url.search);
+    if (!targetURL) {
       return new Response('Not Found', { status: 404 });
     }
 
-    // 构建上游 URL
-    const upstream = UPSTREAMS[route.prefix];
-    if (!upstream) {
-      return new Response('Bad Gateway', { status: 502 });
-    }
-    const upstreamURL = `https://${upstream}${route.path}${url.search || ''}`;
-
     // 构建上游请求
     const upstreamHeaders = cleanRequestHeaders(request.headers);
-    const upstreamRequest = new Request(upstreamURL, {
+    const upstreamRequest = new Request(targetURL, {
       method: request.method,
       headers: upstreamHeaders,
       body: request.method !== 'GET' && request.method !== 'HEAD'
@@ -218,15 +195,22 @@ export default {
     try {
       const response = await fetch(upstreamRequest);
 
-      // 处理重定向
+      // 处理重定向 → 也转成代理格式
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         const location = response.headers.get('location');
         if (location) {
-          let newLoc = rewriteLocationHeader(location);
-          if (newLoc.startsWith('/')) {
-            newLoc = `/gh${newLoc}`;
+          if (location.startsWith('http://') || location.startsWith('https://')) {
+            return Response.redirect(`//${host}/${location}`, response.status);
           }
-          return Response.redirect(newLoc, response.status);
+          // 相对路径：保持在同一仓库上下文中
+          // 从原始 targetURL 提取 base path
+          try {
+            const targetBase = new URL(targetURL);
+            const basePath = targetBase.pathname.replace(/\/[^/]*$/, '');
+            return Response.redirect(`//${host}/${targetBase.origin}${basePath}${location}`, response.status);
+          } catch {
+            return Response.redirect(location, response.status);
+          }
         }
       }
 
@@ -258,7 +242,6 @@ export default {
         });
       }
 
-      // 流式传输非文本内容（图片、文件等）
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

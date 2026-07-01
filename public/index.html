@@ -61,15 +61,13 @@
     <div class="card">
       <h2>📡 代理前缀</h2>
       <table>
-        <thead><tr><th>前缀</th><th>目标</th><th>说明</th></tr></thead>
+        <thead><tr><th>方式</th><th>示例</th></tr></thead>
         <tbody>
-          <tr><td><code>/gh/</code></td><td>github.com</td><td>GitHub 主站</td></tr>
-          <tr><td><code>/raw/</code></td><td>raw.githubusercontent.com</td><td>Raw 文件内容</td></tr>
-          <tr><td><code>/gist/</code></td><td>gist.github.com</td><td>Gist</td></tr>
-          <tr><td><code>/releases/</code></td><td>github.com/.../releases</td><td>Releases 下载</td></tr>
-          <tr><td><code>/assets/</code></td><td>github.githubassets.com</td><td>静态资源</td></tr>
-          <tr><td><code>/api/</code></td><td>api.github.com</td><td>GitHub API</td></tr>
-          <tr><td><code>/objects/</code></td><td>objects.githubusercontent.com</td><td>Git Objects</td></tr>
+          <tr><td><code>⭐ 直接拼接</code></td><td><code>https://github.484947.xyz/https://github.com/user/repo</code></td></tr>
+          <tr><td><code>/gh/</code></td><td><code>/gh/user/repo</code> → github.com</td></tr>
+          <tr><td><code>/raw/</code></td><td><code>/raw/user/repo/...</code> → raw.githubusercontent.com</td></tr>
+          <tr><td><code>/api/</code></td><td><code>/api/repos/...</code> → api.github.com</td></tr>
+          <tr><td><code>/assets/</code></td><td><code>/assets/...</code> → github.githubassets.com</td></tr>
         </tbody>
       </table>
     </div>
@@ -77,33 +75,34 @@
     <div class="card">
       <h2>📖 使用示例</h2>
 
-      <p style="margin-bottom:0.5rem"><strong>克隆仓库</strong></p>
+      <p style="margin-bottom:0.5rem"><strong>⭐ 下载 Release 文件（直接拼接原地址）</strong></p>
       <div class="example" id="ex1">
         <button class="copy-btn" onclick="copy('ex1')">复制</button>
-        git clone <span class="prefix">https://&lt;your-domain&gt;/gh/</span><span class="path">user/repo</span>
+        wget <span class="prefix">https://github.484947.xyz/</span><span class="path">https://github.com/user/repo/releases/download/v1.0/app.zip</span>
+      </div>
+
+      <p style="margin-bottom:0.5rem"><strong>克隆仓库</strong></p>
+      <div class="example" id="ex2">
+        <button class="copy-btn" onclick="copy('ex2')">复制</button>
+        git clone <span class="prefix">https://github.484947.xyz/</span><span class="path">https://github.com/user/repo</span>
       </div>
 
       <p style="margin-bottom:0.5rem"><strong>下载 Raw 文件</strong></p>
-      <div class="example" id="ex2">
-        <button class="copy-btn" onclick="copy('ex2')">复制</button>
-        curl <span class="prefix">https://&lt;your-domain&gt;/raw/</span><span class="path">user/repo/main/README.md</span>
-      </div>
-
-      <p style="margin-bottom:0.5rem"><strong>下载 Release 文件</strong></p>
       <div class="example" id="ex3">
         <button class="copy-btn" onclick="copy('ex3')">复制</button>
-        wget <span class="prefix">https://&lt;your-domain&gt;/releases/</span><span class="path">user/repo/releases/download/v1.0/app.zip</span>
+        curl <span class="prefix">https://github.484947.xyz/</span><span class="path">https://raw.githubusercontent.com/user/repo/main/file.txt</span>
       </div>
 
       <p style="margin-bottom:0.5rem"><strong>访问 GitHub API</strong></p>
       <div class="example" id="ex4">
         <button class="copy-btn" onclick="copy('ex4')">复制</button>
-        curl <span class="prefix">https://&lt;your-domain&gt;/api/</span><span class="path">repos/user/repo/releases/latest</span>
+        curl <span class="prefix">https://github.484947.xyz/</span><span class="path">https://api.github.com/repos/user/repo/releases/latest</span>
       </div>
 
       <div class="note">
-        💡 <strong>Git 全局代理配置：</strong><br>
-        <code>git config --global url."https://&lt;your-domain&gt;/gh/".insteadOf "https://github.com/"</code>
+        💡 <strong>Git 全局代理配置（一劳永逸）：</strong><br>
+        <code>git config --global url."https://github.484947.xyz/https://github.com/".insteadOf "https://github.com/"</code><br>
+        配完后所有 <code>git clone https://github.com/...</code> 自动走代理
       </div>
     </div>
 

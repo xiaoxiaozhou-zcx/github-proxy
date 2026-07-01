@@ -2,6 +2,11 @@
  * 阿里云 ESA Pages - GitHub 反向代理 Edge Function
  *
  * 路由规则：
+ * 直接访问（推荐）：
+ *   /user/repo             → github.com/user/repo
+ *   /user/repo/tree/main   → github.com/user/repo/tree/main
+ *
+ * 带前缀访问：
  *   /gh/user/repo          → github.com/user/repo
  *   /raw/user/repo/...     → raw.githubusercontent.com/user/repo/...
  *   /gist/user/id          → gist.github.com/user/id
@@ -54,6 +59,13 @@ function parseRoute(pathname) {
   // /objects/... → objects.githubusercontent.com/...
   const objectsMatch = pathname.match(/^\/objects\/(.+)$/);
   if (objectsMatch) return { prefix: 'objects', path: `/${objectsMatch[1]}` };
+
+  // 默认：/user/repo/... → github.com/user/repo/...
+  // 匹配 user/repo 格式的路径（至少两段）
+  const bareMatch = pathname.match(/^\/([^/]+)\/([^/]+)(\/.*)?$/);
+  if (bareMatch) {
+    return { prefix: 'gh', path: pathname };
+  }
 
   return null;
 }

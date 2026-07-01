@@ -27,6 +27,10 @@ function parseRoute(pathname) {
   const objectsMatch = pathname.match(/^\/objects\/(.+)$/);
   if (objectsMatch) return { prefix: 'objects', path: `/${objectsMatch[1]}` };
 
+  // 默认：/user/repo/... → github.com/user/repo/...
+  const bareMatch = pathname.match(/^\/([^/]+)\/([^/]+)(\/.*)?$/);
+  if (bareMatch) return { prefix: 'gh', path: pathname };
+
   return null;
 }
 
@@ -53,7 +57,11 @@ const tests = [
   ['/api/repos/torvalds/linux', 'https://api.github.com/repos/torvalds/linux'],
   ['/api/repos/torvalds/linux/releases/latest', 'https://api.github.com/repos/torvalds/linux/releases/latest'],
   ['/objects/githubusercontent.com/repo/file', 'https://objects.githubusercontent.com/githubusercontent.com/repo/file'],
-  ['/unknown/path', null],
+  // 直接访问（不带前缀）
+  ['/torvalds/linux', 'https://github.com/torvalds/linux'],
+  ['/torvalds/linux/tree/master', 'https://github.com/torvalds/linux/tree/master'],
+  ['/cli/cli/releases/download/v2.40.0/gh.tar.gz', 'https://github.com/cli/cli/releases/download/v2.40.0/gh.tar.gz'],
+  ['/unknown/path', 'https://github.com/unknown/path'],  // 默认走 github.com
   ['/', null],
 ];
 

@@ -4,6 +4,7 @@
   "type": "module",
   "description": "GitHub 反向代理 - 阿里云 ESA Pages",
   "scripts": {
+    "build": "echo 'No build needed'",
     "test": "node test.js"
   }
 }

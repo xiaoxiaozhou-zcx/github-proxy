@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Proxy - GitHub 加速代理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #0d1117; color: #c9d1d9; line-height: 1.6;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 800px; width: 100%; }
+    h1 { color: #58a6ff; font-size: 2rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #8b949e; margin-bottom: 2rem; }
+    .card {
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .card h2 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+    td code {
+      background: #0d1117; padding: 2px 6px; border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.9rem; color: #79c0ff;
+    }
+    .example {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+      padding: 1rem; margin: 0.5rem 0; font-family: monospace; font-size: 0.9rem;
+      color: #e6edf3; overflow-x: auto; position: relative;
+    }
+    .example .prefix { color: #58a6ff; }
+    .example .path { color: #7ee787; }
+    .copy-btn {
+      position: absolute; top: 0.5rem; right: 0.5rem; background: #21262d;
+      border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px;
+      border-radius: 4px; cursor: pointer; font-size: 0.75rem;
+    }
+    .copy-btn:hover { background: #30363d; }
+    .note {
+      background: #0d1117; border-left: 3px solid #58a6ff;
+      padding: 0.75rem 1rem; margin: 0.5rem 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .badge {
+      display: inline-block; background: #238636; color: #fff;
+      padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;
+    }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 GitHub Proxy</h1>
+    <p class="subtitle">GitHub 加速代理服务 · Powered by Alibaba Cloud ESA Pages</p>
+
+    <div class="card">
+      <h2>📡 代理前缀</h2>
+      <table>
+        <thead><tr><th>前缀</th><th>目标</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>/gh/</code></td><td>github.com</td><td>GitHub 主站</td></tr>
+          <tr><td><code>/raw/</code></td><td>raw.githubusercontent.com</td><td>Raw 文件内容</td></tr>
+          <tr><td><code>/gist/</code></td><td>gist.github.com</td><td>Gist</td></tr>
+          <tr><td><code>/releases/</code></td><td>github.com/.../releases</td><td>Releases 下载</td></tr>
+          <tr><td><code>/assets/</code></td><td>github.githubassets.com</td><td>静态资源</td></tr>
+          <tr><td><code>/api/</code></td><td>api.github.com</td><td>GitHub API</td></tr>
+          <tr><td><code>/objects/</code></td><td>objects.githubusercontent.com</td><td>Git Objects</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>📖 使用示例</h2>
+
+      <p style="margin-bottom:0.5rem"><strong>克隆仓库</strong></p>
+      <div class="example" id="ex1">
+        <button class="copy-btn" onclick="copy('ex1')">复制</button>
+        git clone <span class="prefix">https://&lt;your-domain&gt;/gh/</span><span class="path">user/repo</span>
+      </div>
+
+      <p style="margin-bottom:0.5rem"><strong>下载 Raw 文件</strong></p>
+      <div class="example" id="ex2">
+        <button class="copy-btn" onclick="copy('ex2')">复制</button>
+        curl <span class="prefix">https://&lt;your-domain&gt;/raw/</span><span class="path">user/repo/main/README.md</span>
+      </div>
+
+      <p style="margin-bottom:0.5rem"><strong>下载 Release 文件</strong></p>
+      <div class="example" id="ex3">
+        <button class="copy-btn" onclick="copy('ex3')">复制</button>
+        wget <span class="prefix">https://&lt;your-domain&gt;/releases/</span><span class="path">user/repo/releases/download/v1.0/app.zip</span>
+      </div>
+
+      <p style="margin-bottom:0.5rem"><strong>访问 GitHub API</strong></p>
+      <div class="example" id="ex4">
+        <button class="copy-btn" onclick="copy('ex4')">复制</button>
+        curl <span class="prefix">https://&lt;your-domain&gt;/api/</span><span class="path">repos/user/repo/releases/latest</span>
+      </div>
+
+      <div class="note">
+        💡 <strong>Git 全局代理配置：</strong><br>
+        <code>git config --global url."https://&lt;your-domain&gt;/gh/".insteadOf "https://github.com/"</code>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⚡ 功能特性</h2>
+      <ul style="padding-left:1.5rem">
+        <li>✅ 支持 Git Clone / Pull 加速</li>
+        <li>✅ 支持 Raw 文件访问</li>
+        <li>✅ 支持 Release 文件下载</li>
+        <li>✅ 支持 GitHub API 代理</li>
+        <li>✅ HTML/CSS/JS 内容自动重写</li>
+        <li>✅ CORS 跨域支持</li>
+        <li>✅ 全球边缘节点加速</li>
+      </ul>
+    </div>
+
+    <p style="text-align:center;color:#484f58;font-size:0.85rem;margin-top:1rem">
+      <span class="badge">ESA Pages</span>
+    </p>
+  </div>
+  <script>
+    function copy(id) {
+      const el = document.getElementById(id);
+      const text = el.textContent.replace('复制', '').trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = el.querySelector('.copy-btn');
+        btn.textContent = '已复制!';
+        setTimeout(() => btn.textContent = '复制', 1500);
+      });
+    }
+  </script>
+</body>
+</html>

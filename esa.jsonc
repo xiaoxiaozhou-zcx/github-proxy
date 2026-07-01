@@ -1,0 +1,9 @@
+{
+  "name": "github-proxy",
+  "entry": "./functions/index.js",
+  "installCommand": "",
+  "buildCommand": "",
+  "assets": {
+    "directory": "./public"
+  }
+}

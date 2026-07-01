@@ -1,0 +1,9 @@
+{
+  "name": "github-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "GitHub 反向代理 - 阿里云 ESA Pages",
+  "scripts": {
+    "test": "node test.js"
+  }
+}

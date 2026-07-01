@@ -193,30 +193,34 @@ export default {
     try {
       const response = await fetch(upstreamRequest);
 
-      // 处理重定向
-      if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const location = response.headers.get('location');
-        if (location) {
-          // GitHub 域名的重定向 → 走代理
-          if (/^https?:\/\/(github\.com|raw\.githubusercontent\.com|gist\.github(?:usercontent)?\.com)\//.test(location)) {
-            return Response.redirect(`https://${host}/${location}`, response.status);
-          }
-          // 其他域名（release-assets 等 CDN）→ 直接让客户端去下载，不走代理
-          if (location.startsWith('http://') || location.startsWith('https://')) {
-            return Response.redirect(location, response.status);
-          }
-          // 相对路径 → 拼接原目标域名
+      // 跟随重定向（内部 fetch，不返回 302 给客户端）
+      let finalResponse = response;
+      let maxRedirects = 5;
+      while ([301, 302, 303, 307, 308].includes(finalResponse.status) && maxRedirects-- > 0) {
+        const location = finalResponse.headers.get('location');
+        if (!location) break;
+        // 构建完整的重定向 URL
+        let nextURL;
+        if (location.startsWith('http://') || location.startsWith('https://')) {
+          nextURL = location;
+        } else {
+          // 相对路径
           try {
-            const targetBase = new URL(targetURL);
-            return Response.redirect(`https://${host}/${targetBase.origin}${new URL(location, targetBase).pathname}`, response.status);
+            const base = new URL(targetURL);
+            nextURL = new URL(location, base).href;
           } catch {
-            return Response.redirect(location, response.status);
+            break;
           }
         }
+        finalResponse = await fetch(nextURL, {
+          method: request.method,
+          headers: cleanRequestHeaders(request.headers),
+          redirect: 'manual',
+        });
       }
 
-      const contentType = response.headers.get('content-type') || '';
-      const responseHeaders = buildResponseHeaders(response.headers);
+      const contentType = finalResponse.headers.get('content-type') || '';
+      const responseHeaders = buildResponseHeaders(finalResponse.headers);
 
       const shouldRewrite =
         contentType.includes('text/html') ||
@@ -226,7 +230,7 @@ export default {
         contentType.includes('application/json');
 
       if (shouldRewrite) {
-        let body = await response.text();
+        let body = await finalResponse.text();
 
         if (contentType.includes('text/html')) {
           body = rewriteHTML(body, host);
@@ -237,15 +241,15 @@ export default {
         }
 
         return new Response(body, {
-          status: response.status,
-          statusText: response.statusText,
+          status: finalResponse.status,
+          statusText: finalResponse.statusText,
           headers: responseHeaders,
         });
       }
 
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
+      return new Response(finalResponse.body, {
+        status: finalResponse.status,
+        statusText: finalResponse.statusText,
         headers: responseHeaders,
       });
     } catch (err) {

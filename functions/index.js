@@ -21,9 +21,7 @@ function resolveTarget(pathname, search) {
   const fullUrlMatch = pathname.match(/^\/https?:\/\/?(.+)$/);
   if (fullUrlMatch) {
     const scheme = pathname.startsWith('/https') ? 'https' : 'http';
-    // fullUrlMatch[1] 可能是 "github.com/user/repo" 或 "/github.com/user/repo"
     let rest = fullUrlMatch[1];
-    // 去掉可能残留的前导斜杠
     if (rest.startsWith('/')) rest = rest.slice(1);
     return `${scheme}://${rest}${search || ''}`;
   }
@@ -195,19 +193,22 @@ export default {
     try {
       const response = await fetch(upstreamRequest);
 
-      // 处理重定向 → 也转成代理格式
+      // 处理重定向
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         const location = response.headers.get('location');
         if (location) {
-          if (location.startsWith('http://') || location.startsWith('https://')) {
-            return Response.redirect(`//${host}/${location}`, response.status);
+          // GitHub 域名的重定向 → 走代理
+          if (/^https?:\/\/(github\.com|raw\.githubusercontent\.com|gist\.github(?:usercontent)?\.com)\//.test(location)) {
+            return Response.redirect(`https://${host}/${location}`, response.status);
           }
-          // 相对路径：保持在同一仓库上下文中
-          // 从原始 targetURL 提取 base path
+          // 其他域名（release-assets 等 CDN）→ 直接让客户端去下载，不走代理
+          if (location.startsWith('http://') || location.startsWith('https://')) {
+            return Response.redirect(location, response.status);
+          }
+          // 相对路径 → 拼接原目标域名
           try {
             const targetBase = new URL(targetURL);
-            const basePath = targetBase.pathname.replace(/\/[^/]*$/, '');
-            return Response.redirect(`//${host}/${targetBase.origin}${basePath}${location}`, response.status);
+            return Response.redirect(`https://${host}/${targetBase.origin}${new URL(location, targetBase).pathname}`, response.status);
           } catch {
             return Response.redirect(location, response.status);
           }
